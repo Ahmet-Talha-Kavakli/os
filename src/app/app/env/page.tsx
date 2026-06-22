@@ -24,10 +24,23 @@ export default function EnvPage() {
   const addEnvField = useStore((s) => s.addEnvField);
   const updateEnvField = useStore((s) => s.updateEnvField);
   const deleteEnvField = useStore((s) => s.deleteEnvField);
+  const reorderEnvKeys = useStore((s) => s.reorderEnvKeys);
 
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? envKeys.filter((e) =>
+        e.name.toLowerCase().includes(q) ||
+        (e.note ?? "").toLowerCase().includes(q) ||
+        (e.fields ?? []).some((f) => f.key.toLowerCase().includes(q) || f.value.toLowerCase().includes(q))
+      )
+    : envKeys;
 
   const toggleReveal = (id: string) => setRevealed((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleExpand = (id: string) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -75,18 +88,52 @@ export default function EnvPage() {
         {envKeys.length === 0 ? (
           <EmptyState icon={<Icon name="Key" size={40} />} title="Henüz key yok" desc="İlk anahtar grubunu oluştur (örn. Supabase)." action={<Button variant="primary" onClick={create}>Grup oluştur</Button>} />
         ) : (
-          <div className="space-y-3">
-            {envKeys.map((e) => {
+          <>
+            {/* arama */}
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-raised)] px-3">
+              <Icon name="MagnifyingGlass" size={15} className="text-[var(--text-faint)]" />
+              <input
+                value={query}
+                onChange={(ev) => setQuery(ev.target.value)}
+                placeholder="Grup, anahtar veya değer ara…"
+                className="flex-1 bg-transparent py-2 text-[14px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
+              />
+              {query && <button onClick={() => setQuery("")} className="text-[var(--text-faint)] hover:text-[var(--text)]"><Icon name="X" size={14} /></button>}
+            </div>
+
+            {filtered.length === 0 ? (
+              <p className="py-10 text-center text-[14px] text-[var(--text-faint)]">"{query}" ile eşleşen grup yok.</p>
+            ) : (
+            <div className="space-y-3">
+            {filtered.map((e) => {
               const proj = projects.find((p) => p.id === e.projectId);
               const env = ENV_LABEL[e.env];
               const open = expanded.has(e.id);
               return (
-                <div key={e.id} className="flex overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-raised)]">
+                <div
+                  key={e.id}
+                  onDragOver={(ev) => { if (dragId && dragId !== e.id) { ev.preventDefault(); setOverId(e.id); } }}
+                  onDrop={(ev) => { ev.preventDefault(); if (dragId) reorderEnvKeys(dragId, e.id); setDragId(null); setOverId(null); }}
+                  className={cn(
+                    "flex overflow-hidden rounded-lg border bg-[var(--bg-raised)] transition-colors",
+                    overId === e.id && dragId !== e.id ? "border-[var(--color-accent)]" : "border-[var(--border)]",
+                    dragId === e.id && "opacity-50"
+                  )}
+                >
                   {/* kapsam renk şeridi */}
                   <div className="w-1 shrink-0" style={{ background: proj?.color ?? "var(--color-tag-gray)" }} />
                   <div className="min-w-0 flex-1">
                   {/* grup başlığı */}
-                  <div className="flex items-center gap-2.5 px-3 py-2.5">
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    <span
+                      draggable
+                      onDragStart={() => setDragId(e.id)}
+                      onDragEnd={() => { setDragId(null); setOverId(null); }}
+                      className="cursor-grab text-[var(--text-faint)] opacity-40 transition-opacity hover:opacity-100 active:cursor-grabbing"
+                      title="Sürükle"
+                    >
+                      <Icon name="DotsSixVertical" size={15} />
+                    </span>
                     <button onClick={() => toggleExpand(e.id)} className="text-[var(--text-faint)] hover:text-[var(--text)]">
                       <Icon name="CaretRight" size={13} className={cn("transition-transform", open && "rotate-90")} />
                     </button>
@@ -165,7 +212,9 @@ export default function EnvPage() {
                 </div>
               );
             })}
-          </div>
+            </div>
+            )}
+          </>
         )}
       </div>
     </PageShell>

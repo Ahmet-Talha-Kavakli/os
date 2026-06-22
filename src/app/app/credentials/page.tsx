@@ -20,10 +20,25 @@ export default function CredentialsPage() {
   const addCredField = useStore((s) => s.addCredField);
   const updateCredField = useStore((s) => s.updateCredField);
   const deleteCredField = useStore((s) => s.deleteCredField);
+  const reorderCredentials = useStore((s) => s.reorderCredentials);
 
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? credentials.filter((c) =>
+        c.label.toLowerCase().includes(q) ||
+        (c.username ?? "").toLowerCase().includes(q) ||
+        (c.url ?? "").toLowerCase().includes(q) ||
+        (c.note ?? "").toLowerCase().includes(q) ||
+        (c.fields ?? []).some((f) => f.label.toLowerCase().includes(q))
+      )
+    : credentials;
 
   const toggleReveal = (id: string) => setRevealed((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const toggleExpand = (id: string) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -52,17 +67,51 @@ export default function CredentialsPage() {
         {credentials.length === 0 ? (
           <EmptyState icon={<Icon name="Lock" size={40} />} title="Henüz kayıt yok" desc="İlk şifreni ekle (GitHub, mail…)." action={<Button variant="primary" onClick={create}>Kayıt oluştur</Button>} />
         ) : (
-          <div className="space-y-3">
-            {credentials.map((c) => {
+          <>
+            {/* arama */}
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-raised)] px-3">
+              <Icon name="MagnifyingGlass" size={15} className="text-[var(--text-faint)]" />
+              <input
+                value={query}
+                onChange={(ev) => setQuery(ev.target.value)}
+                placeholder="Servis, kullanıcı veya not ara…"
+                className="flex-1 bg-transparent py-2 text-[14px] text-[var(--text)] outline-none placeholder:text-[var(--text-faint)]"
+              />
+              {query && <button onClick={() => setQuery("")} className="text-[var(--text-faint)] hover:text-[var(--text)]"><Icon name="X" size={14} /></button>}
+            </div>
+
+            {filtered.length === 0 ? (
+              <p className="py-10 text-center text-[14px] text-[var(--text-faint)]">"{query}" ile eşleşen kayıt yok.</p>
+            ) : (
+            <div className="space-y-3">
+            {filtered.map((c) => {
               const open = expanded.has(c.id);
               const proj = projects.find((p) => p.id === c.projectId);
               return (
-                <div key={c.id} className="flex overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-raised)]">
+                <div
+                  key={c.id}
+                  onDragOver={(ev) => { if (dragId && dragId !== c.id) { ev.preventDefault(); setOverId(c.id); } }}
+                  onDrop={(ev) => { ev.preventDefault(); if (dragId) reorderCredentials(dragId, c.id); setDragId(null); setOverId(null); }}
+                  className={cn(
+                    "flex overflow-hidden rounded-lg border bg-[var(--bg-raised)] transition-colors",
+                    overId === c.id && dragId !== c.id ? "border-[var(--color-accent)]" : "border-[var(--border)]",
+                    dragId === c.id && "opacity-50"
+                  )}
+                >
                   {/* kapsam renk şeridi */}
                   <div className="w-1 shrink-0" style={{ background: proj?.color ?? "var(--color-tag-gray)" }} />
                   <div className="min-w-0 flex-1">
                   {/* başlık */}
-                  <div className="flex items-center gap-2.5 px-3 py-2.5">
+                  <div className="flex items-center gap-2 px-3 py-2.5">
+                    <span
+                      draggable
+                      onDragStart={() => setDragId(c.id)}
+                      onDragEnd={() => { setDragId(null); setOverId(null); }}
+                      className="cursor-grab text-[var(--text-faint)] opacity-40 transition-opacity hover:opacity-100 active:cursor-grabbing"
+                      title="Sürükle"
+                    >
+                      <Icon name="DotsSixVertical" size={15} />
+                    </span>
                     <button onClick={() => toggleExpand(c.id)} className="text-[var(--text-faint)] hover:text-[var(--text)]">
                       <Icon name="CaretRight" size={13} className={cn("transition-transform", open && "rotate-90")} />
                     </button>
@@ -166,7 +215,9 @@ export default function CredentialsPage() {
                 </div>
               );
             })}
-          </div>
+            </div>
+            )}
+          </>
         )}
       </div>
     </PageShell>

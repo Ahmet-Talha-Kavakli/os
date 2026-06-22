@@ -120,6 +120,7 @@ interface State {
   addEnvField: (envId: string) => void;
   updateEnvField: (envId: string, fieldId: string, patch: Partial<EnvField>) => void;
   deleteEnvField: (envId: string, fieldId: string) => void;
+  reorderEnvKeys: (fromId: string, toId: string) => void;
 
   // credentials (çoklu alan)
   addCredential: (c?: Partial<Credential>) => void;
@@ -128,6 +129,7 @@ interface State {
   addCredField: (credId: string) => void;
   updateCredField: (credId: string, fieldId: string, patch: Partial<CredentialField>) => void;
   deleteCredField: (credId: string, fieldId: string) => void;
+  reorderCredentials: (fromId: string, toId: string) => void;
 
   // ideas
   addIdea: (i?: Partial<Idea>) => Idea;
@@ -139,6 +141,18 @@ interface State {
 }
 
 const now = () => new Date().toISOString();
+
+/** Bir diziyi fromId öğesini toId'nin yerine taşıyacak şekilde yeniden sıralar. */
+function reorder<T extends { id: string }>(arr: T[], fromId: string, toId: string): T[] {
+  if (fromId === toId) return arr;
+  const from = arr.findIndex((x) => x.id === fromId);
+  const to = arr.findIndex((x) => x.id === toId);
+  if (from === -1 || to === -1) return arr;
+  const next = arr.slice();
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
+}
 
 export const useStore = create<State>()(
   persist(
@@ -348,6 +362,7 @@ export const useStore = create<State>()(
       deleteEnvField: (envId, fieldId) => set((s) => ({
         envKeys: s.envKeys.map((e) => e.id === envId ? { ...e, fields: e.fields.filter((f) => f.id !== fieldId) } : e),
       })),
+      reorderEnvKeys: (fromId, toId) => set((s) => ({ envKeys: reorder(s.envKeys, fromId, toId) })),
 
       // ---- credentials (çoklu alan) ----
       addCredential: (c) => set((s) => ({
@@ -368,6 +383,7 @@ export const useStore = create<State>()(
       deleteCredField: (credId, fieldId) => set((s) => ({
         credentials: s.credentials.map((c) => c.id === credId ? { ...c, fields: c.fields.filter((f) => f.id !== fieldId) } : c),
       })),
+      reorderCredentials: (fromId, toId) => set((s) => ({ credentials: reorder(s.credentials, fromId, toId) })),
 
       // ---- ideas ----
       addIdea: (i) => {
