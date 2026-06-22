@@ -20,19 +20,16 @@ export default function EnvPage() {
   const addEnvKey = useStore((s) => s.addEnvKey);
   const updateEnvKey = useStore((s) => s.updateEnvKey);
   const deleteEnvKey = useStore((s) => s.deleteEnvKey);
+  const addEnvField = useStore((s) => s.addEnvField);
+  const updateEnvField = useStore((s) => s.updateEnvField);
+  const deleteEnvField = useStore((s) => s.deleteEnvField);
 
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: "", value: "", env: "development" });
-  const [editing, setEditing] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const toggle = (id: string) =>
-    setRevealed((s) => {
-      const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
+  const toggleReveal = (id: string) => setRevealed((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleExpand = (id: string) => setExpanded((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const copy = (id: string, text: string) => {
     navigator.clipboard?.writeText(text);
@@ -40,18 +37,20 @@ export default function EnvPage() {
     setTimeout(() => setCopied((c) => (c === id ? null : c)), 1500);
   };
 
-  const copyAllEnv = () => {
-    const text = envKeys.map((e) => `${e.name}=${e.value}`).join("\n");
-    navigator.clipboard?.writeText(text);
-    setCopied("ALL");
-    setTimeout(() => setCopied((c) => (c === "ALL" ? null : c)), 1500);
+  const copyGroupEnv = (envId: string) => {
+    const g = envKeys.find((e) => e.id === envId);
+    if (!g) return;
+    const text = g.fields.map((f) => `${f.key}=${f.value}`).join("\n");
+    copy("g" + envId, text);
   };
 
-  const submit = () => {
-    if (!form.name.trim()) return;
-    addEnvKey({ name: form.name.trim(), value: form.value, env: form.env as any });
-    setForm({ name: "", value: "", env: "development" });
-    setAdding(false);
+  const copyAll = () => {
+    const text = envKeys.flatMap((e) => e.fields.map((f) => `${f.key}=${f.value}`)).join("\n");
+    copy("ALL", text);
+  };
+
+  const create = () => {
+    addEnvKey({ name: "Yeni grup" });
   };
 
   return (
@@ -60,73 +59,104 @@ export default function EnvPage() {
         <div className="mb-8 flex items-start justify-between">
           <div>
             <h1 className="text-[34px] font-bold leading-tight tracking-[-0.02em] text-[var(--text)]">Env Keyleri</h1>
-            <p className="mt-1.5 text-[15px] text-[var(--text-faint)]">{envKeys.length} anahtar · API key'lerin, tek tıkla kopyala. Yerelde saklanır.</p>
+            <p className="mt-1.5 text-[15px] text-[var(--text-faint)]">{envKeys.length} grup · bir grup birden çok anahtar tutabilir (Supabase → URL, anon, service). Yerelde saklanır.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="glass" onClick={copyAllEnv}>
-              <Icon name={copied === "ALL" ? "Check" : "Copy"} size={15} /> {copied === "ALL" ? "Kopyalandı" : ".env kopyala"}
-            </Button>
-            <Button variant="primary" onClick={() => setAdding((v) => !v)}><Icon name="Plus" size={16} /> Yeni Key</Button>
+            {envKeys.length > 0 && (
+              <Button variant="glass" onClick={copyAll}>
+                <Icon name={copied === "ALL" ? "Check" : "Copy"} size={15} /> {copied === "ALL" ? "Kopyalandı" : ".env kopyala"}
+              </Button>
+            )}
+            <Button variant="primary" onClick={create}><Icon name="Plus" size={16} /> Yeni Grup</Button>
           </div>
         </div>
 
-        {adding && (
-          <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--bg-hover)] p-3">
-            <input autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="KEY_ADI" className="flex-1 rounded-md border border-[var(--border)] bg-[var(--bg-raised)] px-2.5 py-1.5 font-mono text-[13px] text-[var(--text)] outline-none" />
-            <input value={form.value} onChange={(e) => setForm({ ...form, value: e.target.value })} placeholder="değer" className="flex-[2] rounded-md border border-[var(--border)] bg-[var(--bg-raised)] px-2.5 py-1.5 font-mono text-[13px] text-[var(--text)] outline-none" />
-            <select value={form.env} onChange={(e) => setForm({ ...form, env: e.target.value })} className="rounded-md border border-[var(--border)] bg-[var(--bg-raised)] px-2.5 py-1.5 text-[13px] text-[var(--text)] outline-none">
-              <option value="development">Geliştirme</option>
-              <option value="production">Production</option>
-              <option value="shared">Ortak</option>
-            </select>
-            <Button variant="primary" size="sm" onClick={submit}>Ekle</Button>
-          </div>
-        )}
-
         {envKeys.length === 0 ? (
-          <EmptyState icon={<Icon name="Key" size={40} />} title="Henüz key yok" desc="İlk API key'ini ekle." />
+          <EmptyState icon={<Icon name="Key" size={40} />} title="Henüz key yok" desc="İlk anahtar grubunu oluştur (örn. Supabase)." action={<Button variant="primary" onClick={create}>Grup oluştur</Button>} />
         ) : (
-          <div>
-            {envKeys.map((e, i) => {
+          <div className="space-y-3">
+            {envKeys.map((e) => {
               const proj = projects.find((p) => p.id === e.projectId);
               const env = ENV_LABEL[e.env];
-              const show = revealed.has(e.id);
+              const open = expanded.has(e.id);
               return (
-                <div key={e.id}>
-                  {i > 0 && <Divider />}
-                  <div className="group flex items-center gap-3 py-2.5">
-                    <Icon name="Key" size={15} className="shrink-0 text-[var(--text-faint)]" />
-                    <span className="w-56 shrink-0 truncate font-mono text-[13px] font-medium text-[var(--text)]">{e.name}</span>
-                    {editing === e.id ? (
-                      <input
-                        autoFocus value={e.value}
-                        onChange={(ev) => updateEnvKey(e.id, { value: ev.target.value })}
-                        onBlur={() => setEditing(null)}
-                        onKeyDown={(ev) => ev.key === "Enter" && setEditing(null)}
-                        className="flex-1 rounded-md border border-[var(--border)] bg-[var(--bg-raised)] px-2 py-1 font-mono text-[13px] text-[var(--text)] outline-none"
-                      />
-                    ) : show ? (
-                      <button onClick={() => setEditing(e.id)} className="flex-1 truncate text-left font-mono text-[13px] text-[var(--text-dim)] hover:text-[var(--text)]" title="Düzenle">{e.value || <span className="text-[var(--text-faint)]">boş</span>}</button>
-                    ) : (
-                      <span className="flex-1 truncate font-mono text-[13px] text-[var(--text-dim)]">{"•".repeat(Math.min(28, e.value.length || 12))}</span>
-                    )}
-                    {proj && <span className="flex shrink-0 items-center gap-1 text-[12px] text-[var(--text-faint)]"><Icon name={proj.icon} size={12} style={{ color: proj.color }} />{proj.name}</span>}
-                    {env && <Badge color={env.color}>{env.label}</Badge>}
-                    <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                      <button onClick={() => toggle(e.id)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]" title={show ? "Gizle" : "Göster"}>
-                        <Icon name={show ? "EyeSlash" : "Eye"} size={14} />
-                      </button>
-                      <button onClick={() => { if (!show) toggle(e.id); setEditing(e.id); }} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]" title="Düzenle">
-                        <Icon name="PencilSimple" size={14} />
-                      </button>
-                      <button onClick={() => copy(e.id, e.value)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]" title="Kopyala">
-                        <Icon name={copied === e.id ? "Check" : "Copy"} size={14} style={copied === e.id ? { color: "var(--color-health-good)" } : undefined} />
-                      </button>
-                      <button onClick={() => deleteEnvKey(e.id)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--color-health-risk)]" title="Sil">
-                        <Icon name="Trash" size={14} />
-                      </button>
-                    </div>
+                <div key={e.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-raised)]">
+                  {/* grup başlığı */}
+                  <div className="flex items-center gap-2.5 px-3 py-2.5">
+                    <button onClick={() => toggleExpand(e.id)} className="text-[var(--text-faint)] hover:text-[var(--text)]">
+                      <Icon name="CaretRight" size={13} className={cn("transition-transform", open && "rotate-90")} />
+                    </button>
+                    <Icon name="Key" size={15} className="text-[var(--text-faint)]" />
+                    <input
+                      value={e.name}
+                      onChange={(ev) => updateEnvKey(e.id, { name: ev.target.value })}
+                      className="flex-1 bg-transparent text-[14px] font-medium text-[var(--text)] outline-none"
+                    />
+                    <span className="text-[12px] text-[var(--text-faint)]">{e.fields.length} anahtar</span>
+                    {proj && <span className="flex items-center gap-1 text-[12px] text-[var(--text-faint)]"><Icon name={proj.icon} size={12} style={{ color: proj.color }} />{proj.name}</span>}
+                    <select value={e.env} onChange={(ev) => updateEnvKey(e.id, { env: ev.target.value as any })} className="rounded-md bg-transparent text-[12px] text-[var(--text-dim)] outline-none">
+                      <option value="development">Geliştirme</option>
+                      <option value="production">Production</option>
+                      <option value="shared">Ortak</option>
+                    </select>
+                    <button onClick={() => copyGroupEnv(e.id)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]" title="Grubu .env olarak kopyala">
+                      <Icon name={copied === "g" + e.id ? "Check" : "Copy"} size={14} style={copied === "g" + e.id ? { color: "var(--color-health-good)" } : undefined} />
+                    </button>
+                    <button onClick={() => deleteEnvKey(e.id)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--color-health-risk)]" title="Sil">
+                      <Icon name="Trash" size={14} />
+                    </button>
                   </div>
+
+                  {/* alanlar */}
+                  {open && (
+                    <div className="border-t border-[var(--border)] px-3 py-2.5">
+                      <div className="space-y-1.5">
+                        {e.fields.map((f) => {
+                          const show = revealed.has(f.id);
+                          return (
+                            <div key={f.id} className="group flex items-center gap-2">
+                              <input
+                                value={f.key}
+                                onChange={(ev) => updateEnvField(e.id, f.id, { key: ev.target.value })}
+                                placeholder="KEY_ADI"
+                                className="w-56 shrink-0 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono text-[13px] font-medium text-[var(--text)] outline-none"
+                              />
+                              <input
+                                value={f.value}
+                                type={show ? "text" : "password"}
+                                onChange={(ev) => updateEnvField(e.id, f.id, { value: ev.target.value })}
+                                placeholder="değer"
+                                className="flex-1 rounded-md border border-[var(--border)] bg-[var(--bg)] px-2 py-1 font-mono text-[13px] text-[var(--text-dim)] outline-none"
+                              />
+                              <button onClick={() => toggleReveal(f.id)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]" title={show ? "Gizle" : "Göster"}>
+                                <Icon name={show ? "EyeSlash" : "Eye"} size={14} />
+                              </button>
+                              <button onClick={() => copy(f.id, f.value)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--text)]" title="Değeri kopyala">
+                                <Icon name={copied === f.id ? "Check" : "Copy"} size={14} style={copied === f.id ? { color: "var(--color-health-good)" } : undefined} />
+                              </button>
+                              <button onClick={() => deleteEnvField(e.id, f.id)} className="rounded-md p-1.5 text-[var(--text-faint)] opacity-0 transition-opacity hover:text-[var(--color-health-risk)] group-hover:opacity-100" title="Alanı sil">
+                                <Icon name="X" size={13} />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <button onClick={() => addEnvField(e.id)} className="mt-2 flex items-center gap-1.5 text-[13px] text-[var(--text-faint)] hover:text-[var(--color-accent)]">
+                        <Icon name="Plus" size={14} /> Anahtar ekle
+                      </button>
+
+                      {/* not */}
+                      <div className="mt-3">
+                        <textarea
+                          value={e.note ?? ""}
+                          onChange={(ev) => updateEnvKey(e.id, { note: ev.target.value })}
+                          placeholder="Not ekle… (örn. nereden alındı, hangi hesap)"
+                          rows={2}
+                          className="w-full resize-none rounded-md bg-[var(--bg-hover)] px-2.5 py-2 text-[13px] text-[var(--text-dim)] outline-none placeholder:text-[var(--text-faint)]"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

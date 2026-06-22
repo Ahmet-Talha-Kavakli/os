@@ -6,7 +6,7 @@ import { nanoid } from "nanoid";
 import type {
   Project, Task, Page, Goal, ProjectChecklist, Expense, AutomationRule,
   Activity, Notification, Snippet, Member, Block,
-  PromptCollection, PromptItem, EnvKey, Credential, Idea,
+  PromptCollection, PromptItem, EnvKey, EnvField, Credential, CredentialField, Idea,
 } from "./types";
 import {
   MEMBERS, PROJECTS, TASKS, PAGES, GOALS, PROJECT_CHECKLISTS, EXPENSES,
@@ -113,15 +113,21 @@ interface State {
   updatePrompt: (collectionId: string, promptId: string, patch: Partial<PromptItem>) => void;
   deletePrompt: (collectionId: string, promptId: string) => void;
 
-  // env keys
+  // env keys (çoklu alan)
   addEnvKey: (e?: Partial<EnvKey>) => void;
   updateEnvKey: (id: string, patch: Partial<EnvKey>) => void;
   deleteEnvKey: (id: string) => void;
+  addEnvField: (envId: string) => void;
+  updateEnvField: (envId: string, fieldId: string, patch: Partial<EnvField>) => void;
+  deleteEnvField: (envId: string, fieldId: string) => void;
 
-  // credentials
+  // credentials (çoklu alan)
   addCredential: (c?: Partial<Credential>) => void;
   updateCredential: (id: string, patch: Partial<Credential>) => void;
   deleteCredential: (id: string) => void;
+  addCredField: (credId: string) => void;
+  updateCredField: (credId: string, fieldId: string, patch: Partial<CredentialField>) => void;
+  deleteCredField: (credId: string, fieldId: string) => void;
 
   // ideas
   addIdea: (i?: Partial<Idea>) => Idea;
@@ -323,19 +329,45 @@ export const useStore = create<State>()(
         ),
       })),
 
-      // ---- env keys ----
+      // ---- env keys (çoklu alan) ----
       addEnvKey: (e) => set((s) => ({
-        envKeys: [{ id: "ek_" + nanoid(6), name: e?.name ?? "YENI_KEY", value: e?.value ?? "", env: e?.env ?? "development", ...e }, ...s.envKeys],
+        envKeys: [{
+          id: "ek_" + nanoid(6), name: e?.name ?? "YENI_KEY", env: e?.env ?? "development",
+          fields: e?.fields ?? [{ id: "ef_" + nanoid(6), key: e?.name ?? "", value: e?.value ?? "" }],
+          ...e,
+        }, ...s.envKeys],
       })),
       updateEnvKey: (id, patch) => set((s) => ({ envKeys: s.envKeys.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
       deleteEnvKey: (id) => set((s) => ({ envKeys: s.envKeys.filter((e) => e.id !== id) })),
+      addEnvField: (envId) => set((s) => ({
+        envKeys: s.envKeys.map((e) => e.id === envId ? { ...e, fields: [...e.fields, { id: "ef_" + nanoid(6), key: "", value: "" }] } : e),
+      })),
+      updateEnvField: (envId, fieldId, patch) => set((s) => ({
+        envKeys: s.envKeys.map((e) => e.id === envId ? { ...e, fields: e.fields.map((f) => f.id === fieldId ? { ...f, ...patch } : f) } : e),
+      })),
+      deleteEnvField: (envId, fieldId) => set((s) => ({
+        envKeys: s.envKeys.map((e) => e.id === envId ? { ...e, fields: e.fields.filter((f) => f.id !== fieldId) } : e),
+      })),
 
-      // ---- credentials ----
+      // ---- credentials (çoklu alan) ----
       addCredential: (c) => set((s) => ({
-        credentials: [{ id: "cr_" + nanoid(6), label: c?.label ?? "Yeni kayıt", icon: c?.icon ?? "Key", secret: c?.secret ?? "", category: c?.category ?? "other", ...c }, ...s.credentials],
+        credentials: [{
+          id: "cr_" + nanoid(6), label: c?.label ?? "Yeni kayıt", icon: c?.icon ?? "Key", category: c?.category ?? "other",
+          fields: c?.fields ?? [{ id: "cf_" + nanoid(6), label: "Şifre", value: c?.secret ?? "", secret: true }],
+          ...c,
+        }, ...s.credentials],
       })),
       updateCredential: (id, patch) => set((s) => ({ credentials: s.credentials.map((c) => (c.id === id ? { ...c, ...patch } : c)) })),
       deleteCredential: (id) => set((s) => ({ credentials: s.credentials.filter((c) => c.id !== id) })),
+      addCredField: (credId) => set((s) => ({
+        credentials: s.credentials.map((c) => c.id === credId ? { ...c, fields: [...c.fields, { id: "cf_" + nanoid(6), label: "Yeni alan", value: "", secret: true }] } : c),
+      })),
+      updateCredField: (credId, fieldId, patch) => set((s) => ({
+        credentials: s.credentials.map((c) => c.id === credId ? { ...c, fields: c.fields.map((f) => f.id === fieldId ? { ...f, ...patch } : f) } : c),
+      })),
+      deleteCredField: (credId, fieldId) => set((s) => ({
+        credentials: s.credentials.map((c) => c.id === credId ? { ...c, fields: c.fields.filter((f) => f.id !== fieldId) } : c),
+      })),
 
       // ---- ideas ----
       addIdea: (i) => {

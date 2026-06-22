@@ -231,25 +231,44 @@ export interface PromptCollection {
 }
 
 // ---- Env keyleri ----
+// Bir grup birden fazla anahtar tutabilir (örn. Supabase → URL + anon + service key).
+export interface EnvField {
+  id: ID;
+  key: string;   // PROJECT_URL
+  value: string; // https://...
+}
+
 export interface EnvKey {
   id: ID;
-  name: string; // GEMINI_API_KEY
-  value: string;
+  name: string;        // grup adı: "Supabase" veya tekil key adı
+  fields: EnvField[];  // bir veya birden fazla anahtar
   projectId?: ID;
   env: "development" | "production" | "shared";
   note?: string;
+  // geriye uyumluluk (eski tekil alanlar) — yeni kayıtlarda kullanılmaz
+  value?: string;
 }
 
 // ---- Şifreler / kimlik bilgileri ----
+// Bir kayıt birden fazla gizli alan tutabilir (örn. şifre + 2FA yedek + API token).
+export interface CredentialField {
+  id: ID;
+  label: string;   // "Şifre", "2FA yedek kod", "Recovery"
+  value: string;
+  secret: boolean; // gizlensin mi (maskelensin mi)
+}
+
 export interface Credential {
   id: ID;
   label: string; // GitHub
   icon: string;
   username?: string;
-  secret: string;
   url?: string;
   category: "account" | "service" | "card" | "other";
+  fields: CredentialField[]; // bir veya birden fazla alan
   note?: string;
+  // geriye uyumluluk
+  secret?: string;
 }
 
 // ---- Fikirler ----
