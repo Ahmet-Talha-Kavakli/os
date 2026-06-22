@@ -265,6 +265,7 @@ export interface Credential {
   username?: string;
   url?: string;
   category: "account" | "service" | "card" | "other";
+  projectId?: ID; // belirli bir projeye ait, yoksa "Genel"
   fields: CredentialField[]; // bir veya birden fazla alan
   note?: string;
   // geriye uyumluluk

@@ -387,6 +387,22 @@ export const useStore = create<State>()(
     }),
     {
       name: "founder-os-v2",
+      version: 2,
+      // Eski tekil-alan (secret/value) kayıtlarını yeni çoklu-alan (fields) modeline taşı
+      migrate: (persisted: any, version: number) => {
+        const s = persisted ?? {};
+        if (version < 2) {
+          s.credentials = (s.credentials ?? []).map((c: any) => ({
+            ...c,
+            fields: c.fields ?? (c.secret ? [{ id: "cf_mig_" + c.id, label: "Şifre", value: c.secret, secret: true }] : []),
+          }));
+          s.envKeys = (s.envKeys ?? []).map((e: any) => ({
+            ...e,
+            fields: e.fields ?? (e.value !== undefined ? [{ id: "ef_mig_" + e.id, key: e.name ?? "", value: e.value }] : []),
+          }));
+        }
+        return s;
+      },
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     }
   )

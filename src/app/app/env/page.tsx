@@ -6,6 +6,7 @@ import { PageShell } from "@/components/shell/page-header";
 import { Badge, Divider, EmptyState } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { ScopePicker } from "@/components/ui/scope-picker";
 import { cn } from "@/lib/utils";
 
 const ENV_LABEL: Record<string, { label: string; color: string }> = {
@@ -40,12 +41,12 @@ export default function EnvPage() {
   const copyGroupEnv = (envId: string) => {
     const g = envKeys.find((e) => e.id === envId);
     if (!g) return;
-    const text = g.fields.map((f) => `${f.key}=${f.value}`).join("\n");
+    const text = (g.fields ?? []).map((f) => `${f.key}=${f.value}`).join("\n");
     copy("g" + envId, text);
   };
 
   const copyAll = () => {
-    const text = envKeys.flatMap((e) => e.fields.map((f) => `${f.key}=${f.value}`)).join("\n");
+    const text = envKeys.flatMap((e) => (e.fields ?? []).map((f) => `${f.key}=${f.value}`)).join("\n");
     copy("ALL", text);
   };
 
@@ -80,7 +81,10 @@ export default function EnvPage() {
               const env = ENV_LABEL[e.env];
               const open = expanded.has(e.id);
               return (
-                <div key={e.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-raised)]">
+                <div key={e.id} className="flex overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-raised)]">
+                  {/* kapsam renk şeridi */}
+                  <div className="w-1 shrink-0" style={{ background: proj?.color ?? "var(--color-tag-gray)" }} />
+                  <div className="min-w-0 flex-1">
                   {/* grup başlığı */}
                   <div className="flex items-center gap-2.5 px-3 py-2.5">
                     <button onClick={() => toggleExpand(e.id)} className="text-[var(--text-faint)] hover:text-[var(--text)]">
@@ -90,11 +94,11 @@ export default function EnvPage() {
                     <input
                       value={e.name}
                       onChange={(ev) => updateEnvKey(e.id, { name: ev.target.value })}
-                      className="flex-1 bg-transparent text-[14px] font-medium text-[var(--text)] outline-none"
+                      className="min-w-0 flex-1 bg-transparent text-[14px] font-medium text-[var(--text)] outline-none"
                     />
-                    <span className="text-[12px] text-[var(--text-faint)]">{e.fields.length} anahtar</span>
-                    {proj && <span className="flex items-center gap-1 text-[12px] text-[var(--text-faint)]"><Icon name={proj.icon} size={12} style={{ color: proj.color }} />{proj.name}</span>}
-                    <select value={e.env} onChange={(ev) => updateEnvKey(e.id, { env: ev.target.value as any })} className="rounded-md bg-transparent text-[12px] text-[var(--text-dim)] outline-none">
+                    <span className="shrink-0 text-[12px] text-[var(--text-faint)]">{(e.fields ?? []).length} anahtar</span>
+                    <ScopePicker projectId={e.projectId} onChange={(pid) => updateEnvKey(e.id, { projectId: pid })} />
+                    <select value={e.env} onChange={(ev) => updateEnvKey(e.id, { env: ev.target.value as any })} className="shrink-0 rounded-md bg-transparent text-[12px] text-[var(--text-dim)] outline-none">
                       <option value="development">Geliştirme</option>
                       <option value="production">Production</option>
                       <option value="shared">Ortak</option>
@@ -111,7 +115,7 @@ export default function EnvPage() {
                   {open && (
                     <div className="border-t border-[var(--border)] px-3 py-2.5">
                       <div className="space-y-1.5">
-                        {e.fields.map((f) => {
+                        {(e.fields ?? []).map((f) => {
                           const show = revealed.has(f.id);
                           return (
                             <div key={f.id} className="group flex items-center gap-2">
@@ -157,6 +161,7 @@ export default function EnvPage() {
                       </div>
                     </div>
                   )}
+                  </div>
                 </div>
               );
             })}

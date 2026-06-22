@@ -6,12 +6,14 @@ import { PageShell } from "@/components/shell/page-header";
 import { Badge, EmptyState } from "@/components/ui/primitives";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
+import { ScopePicker } from "@/components/ui/scope-picker";
 import { cn } from "@/lib/utils";
 
 const CAT: Record<string, string> = { account: "Hesap", service: "Servis", card: "Kart/Banka", other: "Diğer" };
 
 export default function CredentialsPage() {
   const credentials = useStore((s) => s.credentials);
+  const projects = useStore((s) => s.projects);
   const addCredential = useStore((s) => s.addCredential);
   const updateCredential = useStore((s) => s.updateCredential);
   const deleteCredential = useStore((s) => s.deleteCredential);
@@ -53,8 +55,12 @@ export default function CredentialsPage() {
           <div className="space-y-3">
             {credentials.map((c) => {
               const open = expanded.has(c.id);
+              const proj = projects.find((p) => p.id === c.projectId);
               return (
-                <div key={c.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-raised)]">
+                <div key={c.id} className="flex overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-raised)]">
+                  {/* kapsam renk şeridi */}
+                  <div className="w-1 shrink-0" style={{ background: proj?.color ?? "var(--color-tag-gray)" }} />
+                  <div className="min-w-0 flex-1">
                   {/* başlık */}
                   <div className="flex items-center gap-2.5 px-3 py-2.5">
                     <button onClick={() => toggleExpand(c.id)} className="text-[var(--text-faint)] hover:text-[var(--text)]">
@@ -66,17 +72,18 @@ export default function CredentialsPage() {
                     <input
                       value={c.label}
                       onChange={(ev) => updateCredential(c.id, { label: ev.target.value })}
-                      className="w-44 bg-transparent text-[14px] font-medium text-[var(--text)] outline-none"
+                      className="w-40 shrink-0 bg-transparent text-[14px] font-medium text-[var(--text)] outline-none"
                     />
                     {c.username && (
-                      <button onClick={() => copy(c.id + "u", c.username!)} className="flex items-center gap-1.5 rounded-md px-2 py-1 font-mono text-[13px] text-[var(--text-dim)] hover:bg-[var(--bg-hover)]" title="Kullanıcıyı kopyala">
+                      <button onClick={() => copy(c.id + "u", c.username!)} className="flex min-w-0 items-center gap-1.5 truncate rounded-md px-2 py-1 font-mono text-[13px] text-[var(--text-dim)] hover:bg-[var(--bg-hover)]" title="Kullanıcıyı kopyala">
                         <Icon name={copied === c.id + "u" ? "Check" : "User"} size={13} style={copied === c.id + "u" ? { color: "var(--color-health-good)" } : undefined} />
                         {c.username}
                       </button>
                     )}
                     <span className="flex-1" />
-                    <span className="text-[12px] text-[var(--text-faint)]">{c.fields.length} alan</span>
-                    <select value={c.category} onChange={(ev) => updateCredential(c.id, { category: ev.target.value as any })} className="rounded-md bg-transparent text-[12px] text-[var(--text-dim)] outline-none">
+                    <span className="shrink-0 text-[12px] text-[var(--text-faint)]">{(c.fields ?? []).length} alan</span>
+                    <ScopePicker projectId={c.projectId} onChange={(pid) => updateCredential(c.id, { projectId: pid })} />
+                    <select value={c.category} onChange={(ev) => updateCredential(c.id, { category: ev.target.value as any })} className="shrink-0 rounded-md bg-transparent text-[12px] text-[var(--text-dim)] outline-none">
                       {Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                     <button onClick={() => deleteCredential(c.id)} className="rounded-md p-1.5 text-[var(--text-faint)] hover:bg-[var(--bg-hover)] hover:text-[var(--color-health-risk)]" title="Sil">
@@ -104,7 +111,7 @@ export default function CredentialsPage() {
 
                       {/* gizli alanlar */}
                       <div className="space-y-1.5">
-                        {c.fields.map((f) => {
+                        {(c.fields ?? []).map((f) => {
                           const show = revealed.has(f.id);
                           return (
                             <div key={f.id} className="group flex items-center gap-2">
@@ -155,6 +162,7 @@ export default function CredentialsPage() {
                       </div>
                     </div>
                   )}
+                  </div>
                 </div>
               );
             })}
